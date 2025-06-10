@@ -42,3 +42,26 @@ We have built a Code Review Service that automatically analyzes code changes in 
         - Analysis – (AI-generated review text)
     - Input: Message from SQS
     - Output: Code review stored in DynamoDB under MRAnalysisResults table
+
+Embedding Preprocessing Logic (Default Branch)
+
+    - Prior to running the Gen-AI Review Service, the default branch of the repository is processed by a separate ingestion script.
+    - This script recursively scans all Python source files (.py) in the codebase.
+    - Each file is split into chunks of manageable size (~1000 characters with overlap).
+    - Each chunk is embedded using OpenAI embeddings to create vector representations.
+    - All vectors and metadata (chunk source, text) are saved to persistent storage:
+      - FAISS index (index.faiss)
+      - Chunk data (chunks.json)
+      - Metadata (metadata.pkl)
+    - This index is loaded by the Gen-AI Review Service at runtime to provide relevant code context for diff analysis.
+
+🔵 3. GitLab Writer (Comment Poster)
+
+    - This service listens to DynamoDB Streams for new entries.
+    - When a new record is added (with MR ID, Project ID, and Analysis), it:
+        - Uses a GitLab Private Token to authenticate
+        - Finds the correct Merge Request
+    - Posts the AI-generated Analysis as a comment on the MR
+    - Once the comment is successfully posted, the record is deleted from DynamoDB to avoid duplicate posts.
+    - Input: New entry in DynamoDB
+    - Output: Comment added in GitLab MR
